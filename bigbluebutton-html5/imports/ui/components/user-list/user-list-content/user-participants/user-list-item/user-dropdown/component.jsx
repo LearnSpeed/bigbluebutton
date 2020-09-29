@@ -11,7 +11,8 @@ import DropdownList from '/imports/ui/components/dropdown/list/component';
 import DropdownListItem from '/imports/ui/components/dropdown/list/item/component';
 import DropdownListSeparator from '/imports/ui/components/dropdown/list/separator/component';
 import lockContextContainer from '/imports/ui/components/lock-viewers/context/container';
-
+import { withModalMounter } from '/imports/ui/components/modal/service';
+import RemoveUserModal from '/imports/ui/components/modal/remove-user/component';
 import _ from 'lodash';
 import { Session } from 'meteor/session';
 import { styles } from './styles';
@@ -98,6 +99,22 @@ const messages = defineMessages({
   DirectoryLookupLabel: {
     id: 'app.userList.menu.directoryLookup.label',
     description: 'Directory lookup',
+  },
+  yesLabel: {
+    id: 'app.endMeeting.yesLabel',
+    description: 'confirm button label',
+  },
+  noLabel: {
+    id: 'app.endMeeting.noLabel',
+    description: 'cancel confirm button label',
+  },
+  removeConfirmTitle: {
+    id: 'app.userList.menu.removeConfirmation.label',
+    description: 'title for remove user confirmation modal',
+  },
+  removeConfirmDesc: {
+    id: 'app.userlist.menu.removeConfirmation.desc',
+    description: 'description for remove user confirmation',
   },
 });
 
@@ -220,6 +237,7 @@ class UserDropdown extends PureComponent {
       userLocks,
       isMe,
       meetingIsBreakout,
+      mountModal,
     } = this.props;
     const { showNestedOptions } = this.state;
 
@@ -294,7 +312,13 @@ class UserDropdown extends PureComponent {
       ));
     }
 
-    if (CHAT_ENABLED && enablePrivateChat && isMeteorConnected) {
+    const showChatOption = CHAT_ENABLED
+      && enablePrivateChat
+      && user.clientType !== 'dial-in-user'
+      && !meetingIsBreakout
+      && isMeteorConnected;
+
+    if (showChatOption) {
       actions.push(this.makeDropdownItem(
         'activeChat',
         intl.formatMessage(messages.ChatLabel),
@@ -316,7 +340,7 @@ class UserDropdown extends PureComponent {
       ));
     }
 
-    if (allowedToMuteAudio && isMeteorConnected) {
+    if (allowedToMuteAudio && isMeteorConnected && !meetingIsBreakout) {
       actions.push(this.makeDropdownItem(
         'mute',
         intl.formatMessage(messages.MuteUserAudioLabel),
@@ -325,7 +349,7 @@ class UserDropdown extends PureComponent {
       ));
     }
 
-    if (allowedToUnmuteAudio && !userLocks.userMic && isMeteorConnected) {
+    if (allowedToUnmuteAudio && !userLocks.userMic && isMeteorConnected && !meetingIsBreakout) {
       actions.push(this.makeDropdownItem(
         'unmute',
         intl.formatMessage(messages.UnmuteUserAudioLabel),
@@ -345,16 +369,7 @@ class UserDropdown extends PureComponent {
       ));
     }
 
-    if (allowedToRemove && isMeteorConnected) {
-      actions.push(this.makeDropdownItem(
-        'remove',
-        intl.formatMessage(messages.RemoveUserLabel, { 0: user.name }),
-        () => this.onActionsHide(removeUser(user.userId)),
-        'circle_close',
-      ));
-    }
-
-    if (allowedToPromote && isMeteorConnected) {
+    if (allowedToPromote && !user.guest && isMeteorConnected) {
       actions.push(this.makeDropdownItem(
         'promote',
         intl.formatMessage(messages.PromoteUserLabel),
@@ -363,7 +378,7 @@ class UserDropdown extends PureComponent {
       ));
     }
 
-    if (allowedToDemote && isMeteorConnected) {
+    if (allowedToDemote && !user.guest && isMeteorConnected) {
       actions.push(this.makeDropdownItem(
         'demote',
         intl.formatMessage(messages.DemoteUserLabel),
@@ -389,6 +404,21 @@ class UserDropdown extends PureComponent {
         intl.formatMessage(messages.DirectoryLookupLabel),
         () => this.onActionsHide(requestUserInformation(user.extId)),
         'user',
+      ));
+    }
+
+    if (allowedToRemove && isMeteorConnected) {
+      actions.push(this.makeDropdownItem(
+        'remove',
+        intl.formatMessage(messages.RemoveUserLabel, { 0: user.name }),
+        () => this.onActionsHide(mountModal(
+          <RemoveUserModal
+            intl={intl}
+            user={user}
+            onConfirm={removeUser}
+          />,
+        )),
+        'circle_close',
       ));
     }
 
@@ -628,4 +658,4 @@ class UserDropdown extends PureComponent {
 }
 
 UserDropdown.propTypes = propTypes;
-export default lockContextContainer(UserDropdown);
+export default withModalMounter(lockContextContainer(UserDropdown));

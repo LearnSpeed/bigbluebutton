@@ -3,6 +3,8 @@ import { defineMessages, injectIntl } from 'react-intl';
 import { withTracker } from 'meteor/react-meteor-data';
 import { Session } from 'meteor/session';
 import Auth from '/imports/ui/services/auth';
+import Storage from '/imports/ui/services/storage/session';
+import { meetingIsBreakout } from '/imports/ui/components/app/service';
 import Chat from './component';
 import ChatService from './service';
 
@@ -38,7 +40,15 @@ class ChatContainer extends PureComponent {
   }
 
   render() {
-    const { children } = this.props;
+    const {
+      children,
+      unmounting,
+    } = this.props;
+
+    if (unmounting === true) {
+      return null;
+    }
+
     return (
       <Chat {...this.props}>
         {children}
@@ -48,7 +58,7 @@ class ChatContainer extends PureComponent {
 }
 
 export default injectIntl(withTracker(({ intl }) => {
-  const chatID = Session.get('idChatOpen') || PUBLIC_CHAT_KEY;
+  const chatID = Session.get('idChatOpen');
   let messages = [];
   let isChatLocked = ChatService.isChatLocked(chatID);
   let title = intl.formatMessage(intlMessages.titlePublic);
@@ -80,12 +90,13 @@ export default injectIntl(withTracker(({ intl }) => {
 
     const moderatorTime = time + 1;
     const moderatorId = `moderator-msg-${moderatorTime}`;
+    const modOnlyMessage = Storage.getItem('ModeratorOnlyMessage');
 
     const moderatorMsg = {
       id: moderatorId,
       content: [{
         id: moderatorId,
-        text: welcomeProp.modOnlyMessage,
+        text: modOnlyMessage,
         time: moderatorTime,
       }],
       time: moderatorTime,
@@ -101,11 +112,11 @@ export default injectIntl(withTracker(({ intl }) => {
 
     const messagesFormated = messagesBeforeWelcomeMsg
       .concat(welcomeMsg)
-      .concat(amIModerator ? moderatorMsg : [])
+      .concat((amIModerator && modOnlyMessage) ? moderatorMsg : [])
       .concat(messagesAfterWelcomeMsg);
 
     messages = messagesFormated.sort((a, b) => (a.time - b.time));
-  } else {
+  } else if (chatID) {
     messages = ChatService.getPrivateGroupMessages();
 
     const receiverUser = ChatService.getUser(chatID);
@@ -131,6 +142,11 @@ export default injectIntl(withTracker(({ intl }) => {
       messages.push(messagePartnerLoggedOut);
       isChatLocked = true;
     }
+  } else {
+    // No chatID is set so the panel is closed, about to close, or wasn't opened correctly
+    return {
+      unmounting: true,
+    };
   }
 
   messages = messages.map((message) => {
@@ -157,6 +173,7 @@ export default injectIntl(withTracker(({ intl }) => {
     isChatLocked,
     isMeteorConnected,
     amIModerator,
+    meetingIsBreakout: meetingIsBreakout(),
     actions: {
       handleClosePrivateChat: ChatService.closePrivateChat,
     },

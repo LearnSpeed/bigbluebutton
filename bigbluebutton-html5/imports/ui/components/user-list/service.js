@@ -42,6 +42,8 @@ const CUSTOM_LOGO_URL_KEY = 'CustomLogoUrl';
 
 export const setCustomLogoUrl = path => Storage.setItem(CUSTOM_LOGO_URL_KEY, path);
 
+export const setModeratorOnlyMessage = msg => Storage.setItem('ModeratorOnlyMessage', msg);
+
 const getCustomLogoUrl = () => Storage.getItem(CUSTOM_LOGO_URL_KEY);
 
 const sortUsersByName = (a, b) => {
@@ -177,7 +179,7 @@ const userFindSorting = {
   emojiTime: 1,
   role: 1,
   phoneUser: 1,
-  sortName: 1,
+  name: 1,
   userId: 1,
 };
 
@@ -286,8 +288,7 @@ const isMeetingLocked = (id) => {
     if (lockSettings.disableCam
       || lockSettings.disableMic
       || lockSettings.disablePrivateChat
-      || lockSettings.disablePublicChat
-      || lockSettings.disableNote) {
+      || lockSettings.disablePublicChat) {
       isLocked = true;
     }
   }
@@ -391,11 +392,11 @@ const setEmojiStatus = (userId, emoji) => {
 
 const assignPresenter = (userId) => { makeCall('assignPresenter', userId); };
 
-const removeUser = (userId) => {
+const removeUser = (userId, banUser) => {
   if (isVoiceOnlyUser(userId)) {
     makeCall('ejectUserFromVoice', userId);
   } else {
-    makeCall('removeUser', userId);
+    makeCall('removeUser', userId, banUser);
   }
 };
 
@@ -405,8 +406,8 @@ const toggleVoice = (userId) => {
   } else {
     makeCall('toggleVoice', userId);
     logger.info({
-      logCode: 'usermenu_option_mute_audio',
-      extraInfo: { logType: 'moderator_action' },
+      logCode: 'usermenu_option_mute_toggle_audio',
+      extraInfo: { logType: 'moderator_action', userId },
     }, 'moderator muted user microphone');
   }
 };
@@ -485,17 +486,64 @@ const requestUserInformation = (userId) => {
   makeCall('requestUserInformation', userId);
 };
 
-export const getUserNamesLink = () => {
+const sortUsersByFirstName = (a, b) => {
+  const aName = a.firstName.toLowerCase();
+  const bName = b.firstName.toLowerCase();
+  if (aName < bName) return -1;
+  if (aName > bName) return 1;
+  return 0;
+};
+
+const sortUsersByLastName = (a, b) => {
+  if (!a.lastName && !b.lastName) return 0;
+  if (a.lastName && !b.lastName) return -1;
+  if (!a.lastName && b.lastName) return 1;
+
+  const aName = a.lastName.toLowerCase();
+  const bName = b.lastName.toLowerCase();
+
+  if (aName < bName) return -1;
+  if (aName > bName) return 1;
+  return 0;
+};
+
+const isUserPresenter = (userId) => {
+  const user = Users.findOne({ userId },
+    { fields: { presenter: 1 } });
+  return user ? user.presenter : false;
+};
+
+export const getUserNamesLink = (docTitle, fnSortedLabel, lnSortedLabel) => {
   const mimeType = 'text/plain';
-  const userNamesObj = getUsers();
-  const userNameListString = userNamesObj
-    .map(u => u.name)
-    .join('\r\n');
+  const userNamesObj = getUsers()
+    .map((u) => {
+      const name = u.name.split(' ');
+      return ({
+        firstName: name[0],
+        middleNames: name.length > 2 ? name.slice(1, name.length - 1) : null,
+        lastName: name.length > 1 ? name[name.length - 1] : null,
+      });
+    });
+
+  const getUsernameString = (user) => {
+    const { firstName, middleNames, lastName } = user;
+    return `${firstName || ''} ${middleNames && middleNames.length > 0 ? middleNames.join(' ') : ''} ${lastName || ''}`;
+  };
+
+  const namesByFirstName = userNamesObj.sort(sortUsersByFirstName)
+    .map(u => getUsernameString(u)).join('\r\n');
+
+  const namesByLastName = userNamesObj.sort(sortUsersByLastName)
+    .map(u => getUsernameString(u)).join('\r\n');
+
+  const namesListsString = `${docTitle}\r\n\r\n${fnSortedLabel}\r\n${namesByFirstName}
+    \r\n\r\n${lnSortedLabel}\r\n${namesByLastName}`.replace(/ {2}/g, ' ');
+
   const link = document.createElement('a');
   link.setAttribute('download', `save-users-list-${Date.now()}.txt`);
   link.setAttribute(
     'href',
-    `data: ${mimeType} ;charset=utf-16,${encodeURIComponent(userNameListString)}`,
+    `data: ${mimeType} ;charset=utf-16,${encodeURIComponent(namesListsString)}`,
   );
   return link;
 };
@@ -526,4 +574,5 @@ export default {
   hasPrivateChatBetweenUsers,
   toggleUserLock,
   requestUserInformation,
+  isUserPresenter,
 };

@@ -26,10 +26,10 @@ import java.util.Map;
 import org.bigbluebutton.presentation.ConversionMessageConstants;
 import org.bigbluebutton.presentation.SupportedFileTypes;
 import org.bigbluebutton.presentation.UploadedPresentation;
-import org.jodconverter.OfficeDocumentConverter;
-import org.jodconverter.office.DefaultOfficeManagerBuilder;
-import org.jodconverter.office.OfficeException;
-import org.jodconverter.office.OfficeManager;
+import org.jodconverter.core.office.OfficeException;
+import org.jodconverter.core.office.OfficeManager;
+import org.jodconverter.local.LocalConverter;
+import org.jodconverter.local.office.LocalOfficeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,13 +40,19 @@ public class OfficeToPdfConversionService {
 
   private OfficeDocumentValidator2 officeDocumentValidator;
   private final OfficeManager officeManager;
-  private final OfficeDocumentConverter documentConverter;
+  private final LocalConverter documentConverter;
+  private boolean skipOfficePrecheck = false;
 
-  public OfficeToPdfConversionService() {
-    final DefaultOfficeManagerBuilder configuration = new DefaultOfficeManagerBuilder();
-    configuration.setPortNumbers(8100, 8101, 8102, 8103, 8104);
-    officeManager = configuration.build();
-    documentConverter = new OfficeDocumentConverter(officeManager);
+  public OfficeToPdfConversionService() throws OfficeException {
+    officeManager = LocalOfficeManager
+      .builder()
+      .portNumbers(8100, 8101, 8102, 8103, 8104)
+      .build();
+    documentConverter = LocalConverter
+      .builder()
+      .officeManager(officeManager)
+      .filterChain(new OfficeDocumentConversionFilter())
+      .build();
   }
 
   /*
@@ -57,8 +63,8 @@ public class OfficeToPdfConversionService {
   public UploadedPresentation convertOfficeToPdf(UploadedPresentation pres) {
     initialize(pres);
     if (SupportedFileTypes.isOfficeFile(pres.getFileType())) {
-      boolean valid = officeDocumentValidator.isValid(pres);
-      if (!valid) {
+      // Check if we need to precheck office document
+      if (!skipOfficePrecheck && officeDocumentValidator.isValid(pres)) {
         Map<String, Object> logData = new HashMap<>();
         logData.put("meetingId", pres.getMeetingId());
         logData.put("presId", pres.getId());
@@ -95,6 +101,8 @@ public class OfficeToPdfConversionService {
         Gson gson = new Gson();
         String logStr = gson.toJson(logData);
         log.warn(" --analytics-- data={}", logStr);
+        pres.setConversionStatus(ConversionMessageConstants.OFFICE_DOC_CONVERSION_FAILED_KEY);
+        return pres;
       }
     }
     return pres;
@@ -126,13 +134,16 @@ public class OfficeToPdfConversionService {
     officeDocumentValidator = v;
   }
 
+  public void setSkipOfficePrecheck(boolean skipOfficePrecheck) {
+    this.skipOfficePrecheck = skipOfficePrecheck;
+  }
+
   public void start() {
     try {
       officeManager.start();
     } catch (OfficeException e) {
       log.error("Could not start Office Manager", e);
     }
-
   }
 
   public void stop() {

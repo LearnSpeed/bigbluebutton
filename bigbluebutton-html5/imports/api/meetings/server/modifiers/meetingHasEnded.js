@@ -19,6 +19,9 @@ import clearNote from '/imports/api/note/server/modifiers/clearNote';
 import clearNetworkInformation from '/imports/api/network-information/server/modifiers/clearNetworkInformation';
 import clearLocalSettings from '/imports/api/local-settings/server/modifiers/clearLocalSettings';
 import clearRecordMeeting from './clearRecordMeeting';
+import clearVoiceCallStates from '/imports/api/voice-call-states/server/modifiers/clearVoiceCallStates';
+import clearVideoStreams from '/imports/api/video-streams/server/modifiers/clearVideoStreams';
+import BannedUsers from '/imports/api/users/server/store/bannedUsers';
 
 export default function meetingHasEnded(meetingId) {
   removeAnnotationsStreamer(meetingId);
@@ -40,6 +43,9 @@ export default function meetingHasEnded(meetingId) {
     clearNetworkInformation(meetingId);
     clearLocalSettings(meetingId);
     clearRecordMeeting(meetingId);
+    clearVoiceCallStates(meetingId);
+    clearVideoStreams(meetingId);
+    BannedUsers.delete(meetingId);
 
     return Logger.info(`Cleared Meetings with id ${meetingId}`);
   });

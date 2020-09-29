@@ -27,7 +27,14 @@ with BigBlueButton; if not, see <http://www.gnu.org/licenses/>.
         http://www.springframework.org/schema/util/spring-util-2.0.xsd">
 
 
-    <bean id="registeredUserCleanupTimerTask" class="org.bigbluebutton.web.services.RegisteredUserCleanupTimerTask"/>
+    <bean id="characterEncodingFilter" class="org.springframework.web.filter.CharacterEncodingFilter">
+        <property name="encoding">
+            <value>utf-8</value>
+        </property>
+    </bean>
+
+    <bean id="userCleanupTimerTask" class="org.bigbluebutton.web.services.UserCleanupTimerTask"/>
+    <bean id="enteredUserCleanupTimerTask" class="org.bigbluebutton.web.services.EnteredUserCleanupTimerTask"/>
 
     <bean id="keepAliveService" class="org.bigbluebutton.web.services.KeepAliveService"
           init-method="start" destroy-method="stop">
@@ -41,10 +48,13 @@ with BigBlueButton; if not, see <http://www.gnu.org/licenses/>.
         <property name="presDownloadService" ref="presDownloadService"/>
         <property name="paramsProcessorUtil" ref="paramsProcessorUtil"/>
         <property name="stunTurnService" ref="stunTurnService"/>
-        <property name="registeredUserCleanupTimerTask" ref="registeredUserCleanupTimerTask"/>
+        <property name="userCleanupTimerTask" ref="userCleanupTimerTask"/>
+        <property name="enteredUserCleanupTimerTask" ref="enteredUserCleanupTimerTask"/>
         <property name="gw" ref="bbbWebApiGWApp"/>
         <property name="callbackUrlService" ref="callbackUrlService"/>
         <property name="keepEvents" value="${keepEvents}"/>
+        <property name="usersTimeout" value="${usersTimeout}"/>
+        <property name="enteredUsersTimeout" value="${enteredUsersTimeout}"/>
     </bean>
 
     <bean id="oldMessageReceivedGW" class="org.bigbluebutton.api2.bus.OldMessageReceivedGW">
@@ -152,6 +162,7 @@ with BigBlueButton; if not, see <http://www.gnu.org/licenses/>.
         <property name="lockSettingsLockOnJoin" value="${lockSettingsLockOnJoin}"/>
         <property name="lockSettingsLockOnJoinConfigurable" value="${lockSettingsLockOnJoinConfigurable}"/>
         <property name="allowDuplicateExtUserid" value="${allowDuplicateExtUserid}"/>
+        <property name="endWhenNoModerator" value="${endWhenNoModerator}"/>
     </bean>
 
     <import resource="doc-conversion.xml"/>
