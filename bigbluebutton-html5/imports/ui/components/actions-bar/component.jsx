@@ -2,6 +2,7 @@ import React, { PureComponent } from 'react';
 import cx from 'classnames';
 import { styles } from './styles.scss';
 import DesktopShare from './desktop-share/component';
+import BookmarkContainer from '../bookmark/container';
 import ActionsDropdown from './actions-dropdown/component';
 import QuickPollDropdown from './quick-poll-dropdown/component';
 import AudioControlsContainer from '../audio/audio-controls/container';
@@ -77,6 +78,9 @@ class ActionsBar extends PureComponent {
           }
         </div>
         <div className={cx(actionBarClasses)}>
+          <BookmarkContainer {...{
+            amIModerator}}
+          />
           <AudioControlsContainer />
           {enableVideo
             ? (
