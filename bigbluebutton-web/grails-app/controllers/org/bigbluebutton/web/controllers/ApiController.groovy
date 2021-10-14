@@ -400,29 +400,8 @@ class ApiController {
     if (userCustomData.size() > 0)
       meetingService.addUserCustomData(meeting.getInternalId(), externUserID, userCustomData);
 
-    String configxml = null;
-
-    if (!StringUtils.isEmpty(params.configToken)) {
-      Config conf = meeting.getConfig(params.configToken);
-      if (conf == null) {
-        // Check if this config is one of our pre-built config
-        configxml = configService.getConfig(params.configToken)
-        if (configxml == null) {
-          // BEGIN - backward compatibility
-          invalid("noConfigFound", "We could not find a config for this request.", REDIRECT_RESPONSE);
-          return
-          // END - backward compatibility
-
-          errors.noConfigFound();
-          respondWithErrors(errors);
-        }
-      } else {
-        configxml = conf.config;
-      }
-    } else {
-      Config conf = meeting.getDefaultConfig();
-      configxml = conf.config;
-    }
+    Config conf = meeting.getDefaultConfig();
+    String configxml = conf.config;
 
     // Do not fail if there's no default config.xml, needed for an HTML5 client only scenario
 
@@ -521,6 +500,11 @@ class ApiController {
     if (guestStatusVal.equals(GuestPolicy.WAIT)) {
       String guestWaitUrl = paramsProcessorUtil.getDefaultGuestWaitURL();
       destUrl = guestWaitUrl + "?sessionToken=" + sessionToken
+      // Check if the user has her/his default locale overridden by an userdata
+      String customLocale = userCustomData.get("bbb_override_default_locale")
+      if (customLocale != null) {
+        destUrl += "&locale=" + customLocale
+      }
       msgKey = "guestWait"
       msgValue = "Guest waiting for approval to join meeting."
     } else if (guestStatusVal.equals(GuestPolicy.DENY)) {

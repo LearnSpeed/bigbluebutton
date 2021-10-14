@@ -6,18 +6,22 @@ import Settings from '/imports/ui/services/settings';
 import LoadingScreen from '/imports/ui/components/loading-screen/component';
 import getFromUserSettings from '/imports/ui/services/users-settings';
 import _ from 'lodash';
+import { Session } from 'meteor/session';
 
 const propTypes = {
   locale: PropTypes.string,
+  overrideLocaleFromPassedParameter: PropTypes.string,
   children: PropTypes.element.isRequired,
 };
 
 const DEFAULT_LANGUAGE = Meteor.settings.public.app.defaultSettings.application.fallbackLocale;
 
-const RTL_LANGUAGES = ['ar', 'he', 'fa'];
+const RTL_LANGUAGES = ['ar', 'dv', 'fa', 'he'];
+const LARGE_FONT_LANGUAGES = ['te', 'km'];
 
 const defaultProps = {
   locale: DEFAULT_LANGUAGE,
+  overrideLocaleFromPassedParameter: null,
 };
 
 class IntlStartup extends Component {
@@ -30,6 +34,8 @@ class IntlStartup extends Component {
       document.body.parentNode.setAttribute('dir', 'ltr');
       Settings.application.isRTL = false;
     }
+    Session.set('isLargeFont', LARGE_FONT_LANGUAGES.includes(localeName.substring(0, 2)));
+    window.dispatchEvent(new Event('localeChanged'));
     Settings.save();
   }
 
@@ -56,9 +62,14 @@ class IntlStartup extends Component {
 
   componentDidUpdate(prevProps) {
     const { fetching, messages, normalizedLocale } = this.state;
-    const { locale } = this.props;
-    const shouldFetch = (!fetching && _.isEmpty(messages)) || ((locale !== prevProps.locale) && (normalizedLocale && (locale !== normalizedLocale)));
-    if (shouldFetch) this.fetchLocalizedMessages(locale);
+    const { locale, overrideLocaleFromPassedParameter } = this.props;
+
+    if (overrideLocaleFromPassedParameter !== prevProps.overrideLocaleFromPassedParameter) {
+      this.fetchLocalizedMessages(overrideLocaleFromPassedParameter);
+    } else {
+      const shouldFetch = (!fetching && _.isEmpty(messages)) || ((locale !== prevProps.locale) && (normalizedLocale && (locale !== normalizedLocale)));
+      if (shouldFetch) this.fetchLocalizedMessages(locale);
+    }
   }
 
   fetchLocalizedMessages(locale, init = false) {

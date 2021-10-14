@@ -17,6 +17,7 @@ import CaptionsWriterMenu from '/imports/ui/components/captions/writer-menu/cont
 import DropdownListSeparator from '/imports/ui/components/dropdown/list/separator/component';
 import { styles } from './styles';
 import { getUserNamesLink } from '/imports/ui/components/user-list/service';
+import Settings from '/imports/ui/services/settings';
 
 const propTypes = {
   intl: PropTypes.shape({
@@ -33,6 +34,7 @@ const propTypes = {
   hasBreakoutRoom: PropTypes.bool.isRequired,
   isBreakoutEnabled: PropTypes.bool.isRequired,
   isBreakoutRecordable: PropTypes.bool.isRequired,
+  dynamicGuestPolicy: PropTypes.bool.isRequired,
 };
 
 const intlMessages = defineMessages({
@@ -155,16 +157,17 @@ class UserOptions extends PureComponent {
 
   onSaveUserNames() {
     const { intl, meetingName } = this.props;
+    const lang = Settings.application.locale;
     const date = new Date();
+
+    const dateString = lang ? date.toLocaleDateString(lang) : date.toLocaleDateString();
+    const timeString = lang ? date.toLocaleTimeString(lang) : date.toLocaleTimeString();
+
     getUserNamesLink(
       intl.formatMessage(intlMessages.savedNamesListTitle,
         {
           0: meetingName,
-          1: `${date.toLocaleDateString(
-            document.documentElement.lang,
-          )}:${date.toLocaleTimeString(
-            document.documentElement.lang,
-          )}`,
+          1: `${dateString}:${timeString}`,
         }),
       intl.formatMessage(intlMessages.sortedFirstNameHeading),
       intl.formatMessage(intlMessages.sortedLastNameHeading),
@@ -228,6 +231,7 @@ class UserOptions extends PureComponent {
       amIModerator,
       users,
       isMeteorConnected,
+      dynamicGuestPolicy,
     } = this.props;
 
     const canCreateBreakout = amIModerator
@@ -292,7 +296,7 @@ class UserOptions extends PureComponent {
         />
       ) : null
       ),
-      (!meetingIsBreakout && isMeteorConnected ? (
+      (!meetingIsBreakout && isMeteorConnected && dynamicGuestPolicy ? (
         <DropdownListItem
           key={this.guestPolicyId}
           icon="user"

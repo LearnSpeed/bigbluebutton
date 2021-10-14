@@ -109,7 +109,7 @@ class VideoProvider extends Component {
     this.wsQueue = [];
     this.restartTimeout = {};
     this.restartTimer = {};
-    this.webRtcPeers = {};
+    this.webRtcPeers = VideoService.getWebRtcPeers();
     this.outboundIceQueues = {};
     this.videoTags = {};
 
@@ -280,8 +280,7 @@ class VideoProvider extends Component {
     this.disconnectStreams(streamsToDisconnect);
 
     if (CAMERA_QUALITY_THRESHOLDS_ENABLED) {
-      const floorStream = streams.find(vs => vs.floor === true);
-      this.updateThreshold(this.props.totalNumberOfStreams, floorStream);
+      this.updateThreshold(this.props.totalNumberOfStreams);
     }
   }
 
@@ -788,7 +787,16 @@ class VideoProvider extends Component {
   }
 
   destroyVideoTag(stream) {
-    delete this.videoTags[stream]
+    const videoElement = this.videoTags[stream];
+
+    if (videoElement == null) return;
+
+    if (typeof videoElement.pause === 'function') {
+      videoElement.pause();
+      videoElement.srcObject = null;
+    }
+
+    delete this.videoTags[stream];
   }
 
   handlePlayStop(message) {

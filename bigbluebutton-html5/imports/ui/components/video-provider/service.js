@@ -44,6 +44,11 @@ const {
   defaultSorting: DEFAULT_SORTING,
 } = Meteor.settings.public.kurento.cameraSortingModes;
 
+const FILTER_VIDEO_STATS = [
+  'outbound-rtp',
+  'inbound-rtp',
+];
+
 const TOKEN = '_';
 
 class VideoService {
@@ -73,6 +78,7 @@ class VideoService {
       }
       this.updateNumberOfDevices();
     }
+    this.webRtcPeers = {};
   }
 
   defineProperties(obj) {
@@ -364,10 +370,15 @@ class VideoService {
     // Recalculate total number of pages
     this.setNumberOfPages(mine.length, others.length, pageSize);
     const chunkIndex = this.currentVideoPageIndex * pageSize;
-    const paginatedStreams = sortVideoStreams(others, PAGINATION_SORTING)
+
+    // This is an extra check because pagination is globally in effect (hard
+    // limited page sizes, toggles on), but we might still only have one page.
+    // Use the default sorting method if that's the case.
+    const sortingMethod = (this.numberOfPages > 1) ? PAGINATION_SORTING : DEFAULT_SORTING;
+    const paginatedStreams = sortVideoStreams(others, sortingMethod)
       .slice(chunkIndex, (chunkIndex + pageSize)) || [];
 
-    if (getSortingMethod(PAGINATION_SORTING).localFirst) {
+    if (getSortingMethod(sortingMethod).localFirst) {
       return [...mine, ...paginatedStreams];
     }
 
@@ -514,9 +525,14 @@ class VideoService {
   }
 
   webcamsOnlyForModerator() {
-    const m = Meetings.findOne({ meetingId: Auth.meetingID },
+    const meeting = Meetings.findOne({ meetingId: Auth.meetingID },
       { fields: { 'usersProp.webcamsOnlyForModerator': 1 } });
-    return m?.usersProp ? m.usersProp.webcamsOnlyForModerator : false;
+    const user = Users.findOne({ userId: Auth.userID }, { fields: { locked: 1, role: 1 } });
+
+    if (meeting?.usersProp && user?.role !== ROLE_MODERATOR && user?.locked) {
+      return meeting.usersProp.webcamsOnlyForModerator;
+    }
+    return false;
   }
 
   getInfo() {
@@ -686,11 +702,14 @@ class VideoService {
         const { track } = sender;
         if (track && track.kind === 'video') {
           const parameters = sender.getParameters();
-          if (!parameters.encodings) {
+          const normalizedBitrate = bitrate * 1000;
+
+          // The encoder parameters might not be up yet; if that's the case,
+          // add a filler object so we can alter the parameters anyways
+          if (parameters.encodings == null || parameters.encodings.length === 0) {
             parameters.encodings = [{}];
           }
 
-          const normalizedBitrate = bitrate * 1000;
           // Only reset bitrate if it changed in some way to avoid enconder fluctuations
           if (parameters.encodings[0].maxBitrate !== normalizedBitrate) {
             parameters.encodings[0].maxBitrate = normalizedBitrate;
@@ -794,6 +813,77 @@ class VideoService {
 
     return finalThreshold;
   }
+
+  /**
+   * Getter for webRtcPeers hash, which stores a reference for all
+   * RTCPeerConnection objects.
+   */
+  getWebRtcPeers() {
+    return this.webRtcPeers;
+  }
+
+  /**
+   * Get all active video peers.
+   * @returns An Object containing the reference for all active peers peers
+   */
+  getActivePeers() {
+    const videoData = this.getVideoStreams();
+
+    if (!videoData) return null;
+
+    const { streams: activeVideoStreams } = videoData;
+
+    if (!activeVideoStreams) return null;
+
+    const peers = this.getWebRtcPeers();
+
+    const activePeers = {};
+
+    activeVideoStreams.forEach((stream) => {
+      if (peers[stream.stream]) {
+        activePeers[stream.stream] = peers[stream.stream].peerConnection;
+      }
+    });
+
+    return activePeers;
+  }
+
+  /**
+   * Get stats about all active video peer.
+   * We filter the status based on FILTER_VIDEO_STATS constant.
+   *
+   * For more information see:
+   * https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/getStats
+   * and
+   * https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
+   * @returns An Object containing the information about each active peer.
+   *          The returned object follows the format:
+   *          {
+   *            peerId: RTCStatsReport
+   *          }
+   */
+  async getStats() {
+    const peers = this.getActivePeers();
+
+    if (!peers) return null;
+
+    const stats = {};
+
+    await Promise.all(Object.keys(peers).map(async (peerId) => {
+      const peerStats = await peers[peerId].getStats();
+
+      const videoStats = {};
+
+      peerStats.forEach((stat) => {
+        if (FILTER_VIDEO_STATS.includes(stat.type)) {
+          videoStats[stat.type] = stat;
+        }
+      });
+      stats[peerId] = videoStats;
+    }));
+
+    return stats;
+  }
 }
 
 const videoService = new VideoService();
@@ -835,4 +925,6 @@ export default {
   getNextVideoPage: () => videoService.getNextVideoPage(),
   getPageChangeDebounceTime: () => { return PAGE_CHANGE_DEBOUNCE_TIME },
   shouldRenderPaginationToggle: () => videoService.shouldRenderPaginationToggle(),
+  getWebRtcPeers: () => videoService.getWebRtcPeers(),
+  getStats: () => videoService.getStats(),
 };

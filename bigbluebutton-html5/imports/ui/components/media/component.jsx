@@ -18,6 +18,7 @@ const propTypes = {
   disableVideo: PropTypes.bool,
   audioModalIsOpen: PropTypes.bool,
   layoutContextState: PropTypes.instanceOf(Object).isRequired,
+  isRTL: PropTypes.bool.isRequired,
 };
 
 const defaultProps = {
@@ -46,6 +47,7 @@ export default class Media extends Component {
       usersVideo,
       layoutContextState,
       isMeteorConnected,
+      isRTL,
     } = this.props;
 
     const { webcamsPlacement: placement } = layoutContextState;
@@ -69,7 +71,6 @@ export default class Media extends Component {
     });
     const { viewParticipantsWebcams } = Settings.dataSaving;
     const showVideo = usersVideo.length > 0 && viewParticipantsWebcams && isMeteorConnected;
-    const fullHeight = !showVideo || (webcamsPlacement === 'floating');
 
     return (
       <div
@@ -118,6 +119,7 @@ export default class Media extends Component {
             disableVideo={disableVideo}
             audioModalIsOpen={audioModalIsOpen}
             usersVideo={usersVideo}
+            isRTL={isRTL}
           />
         ) : null}
       </div>
